@@ -34,14 +34,13 @@ class NoteListScreen extends StatefulWidget {
 }
 
 class _NoteListScreenState extends State<NoteListScreen> {
-  // Controller for the search text field
   final TextEditingController _searchController = TextEditingController();
   String _searchText = "";
 
   @override
   void initState() {
     super.initState();
-    // Listen to search text changes
+    // Listening to search input changes to rebuild UI
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text;
@@ -57,9 +56,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Dynamic Query: Filter by search text if it's not empty
+    // Defining the Firestore query for notes
     Query query = FirebaseFirestore.instance.collection('notes');
 
+    // Apply filtering if the search text is not empty
     if (_searchText.isNotEmpty) {
       query = query
           .where('text', isGreaterThanOrEqualTo: _searchText)
@@ -73,7 +73,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
         title: const Text("My Notes"),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
-        // Adding the Search Bar to the bottom of the AppBar
+        // Search bar implementation in the bottom of AppBar
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -144,7 +144,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
   }
 
-  // --- Add/Edit Dialog ---
+  // --- Add/Edit Dialog with Empty Check Fix ---
   void _showAddNoteDialog(BuildContext context, {DocumentSnapshot? doc}) {
     final TextEditingController controller = TextEditingController(
       text: doc != null ? doc['text'] : "",
@@ -169,15 +169,18 @@ class _NoteListScreenState extends State<NoteListScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (controller.text.isNotEmpty) {
+              // FIX: .trim() removes spaces to prevent saving empty notes
+              if (controller.text.trim().isNotEmpty) {
                 if (doc == null) {
+                  // Creating a new note
                   await FirebaseFirestore.instance.collection('notes').add({
-                    'text': controller.text,
+                    'text': controller.text.trim(),
                     'createdAt': FieldValue.serverTimestamp(),
                   });
                 } else {
+                  // Updating existing note
                   await doc.reference.update({
-                    'text': controller.text,
+                    'text': controller.text.trim(),
                     'updatedAt': FieldValue.serverTimestamp(),
                   });
                 }
