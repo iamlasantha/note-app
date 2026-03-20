@@ -26,30 +26,86 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class NoteListScreen extends StatelessWidget {
+class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
 
   @override
+  State<NoteListScreen> createState() => _NoteListScreenState();
+}
+
+class _NoteListScreenState extends State<NoteListScreen> {
+  // Controller for the search text field
+  final TextEditingController _searchController = TextEditingController();
+  String _searchText = "";
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to search text changes
+    _searchController.addListener(() {
+      setState(() {
+        _searchText = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Dynamic Query: Filter by search text if it's not empty
+    Query query = FirebaseFirestore.instance.collection('notes');
+
+    if (_searchText.isNotEmpty) {
+      query = query
+          .where('text', isGreaterThanOrEqualTo: _searchText)
+          .where('text', isLessThanOrEqualTo: '$_searchText\uf8ff');
+    } else {
+      query = query.orderBy('createdAt', descending: true);
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Firebase Notes"),
+        title: const Text("My Notes"),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
+        // Adding the Search Bar to the bottom of the AppBar
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: "Search notes...",
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.5),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+        ),
       ),
       body: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('notes')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream: query.snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Error!"));
+          if (snapshot.hasError)
+            return const Center(child: Text("Error loading notes"));
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("තවම සටහන් කිසිවක් නැත."));
+            return const Center(child: Text("No notes found."));
           }
 
           return ListView.builder(
@@ -70,7 +126,6 @@ class NoteListScreen extends StatelessWidget {
                               .split('.')[0]
                         : "",
                   ),
-                  // නෝට් එක උඩ ටැප් කළාම Edit කරන්න පුළුවන්
                   onTap: () => _showAddNoteDialog(context, doc: doc),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
@@ -89,7 +144,7 @@ class NoteListScreen extends StatelessWidget {
     );
   }
 
-  // --- නෝට් එකක් ඇතුළත් කිරීමට හෝ සංස්කරණය කිරීමට (Add/Edit) ---
+  // --- Add/Edit Dialog ---
   void _showAddNoteDialog(BuildContext context, {DocumentSnapshot? doc}) {
     final TextEditingController controller = TextEditingController(
       text: doc != null ? doc['text'] : "",
@@ -102,10 +157,10 @@ class NoteListScreen extends StatelessWidget {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: "ඔබේ සටහන මෙතැන ලියන්න...",
+            hintText: "Write your note here...",
           ),
           autofocus: true,
-          maxLines: null, // පේළි කිහිපයක් ලියන්න පුළුවන් වෙන්න
+          maxLines: null,
         ),
         actions: [
           TextButton(
@@ -116,19 +171,17 @@ class NoteListScreen extends StatelessWidget {
             onPressed: () async {
               if (controller.text.isNotEmpty) {
                 if (doc == null) {
-                  // අලුත් එකක් එකතු කිරීම
                   await FirebaseFirestore.instance.collection('notes').add({
                     'text': controller.text,
                     'createdAt': FieldValue.serverTimestamp(),
                   });
                 } else {
-                  // පරණ එකක් Update කිරීම
                   await doc.reference.update({
                     'text': controller.text,
                     'updatedAt': FieldValue.serverTimestamp(),
                   });
                 }
-                if (context.mounted) Navigator.pop(context);
+                if (mounted) Navigator.pop(context);
               }
             },
             child: Text(doc != null ? "Update" : "Save"),
@@ -138,13 +191,13 @@ class NoteListScreen extends StatelessWidget {
     );
   }
 
-  // --- මකන්න කලින් ඇසීමට (Delete Confirmation) ---
+  // --- Delete Confirmation Dialog ---
   void _showDeleteConfirmDialog(BuildContext context, DocumentSnapshot doc) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Delete"),
-        content: const Text("ඔබට විශ්වාසද මෙම සටහන මැකීමට අවශ්‍ය බව?"),
+        content: const Text("Are you sure you want to delete this note?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -153,7 +206,7 @@ class NoteListScreen extends StatelessWidget {
           TextButton(
             onPressed: () async {
               await doc.reference.delete();
-              if (context.mounted) Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
             },
             child: const Text("Yes", style: TextStyle(color: Colors.red)),
           ),
