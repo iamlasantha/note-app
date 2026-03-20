@@ -16,7 +16,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
+      title: 'Advanced Note App',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
       home: const NoteListScreen(),
     );
   }
@@ -28,7 +32,11 @@ class NoteListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("My Firebase Notes"), centerTitle: true),
+      appBar: AppBar(
+        title: const Text("My Firebase Notes"),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        centerTitle: true,
+      ),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('notes')
@@ -38,6 +46,10 @@ class NoteListScreen extends StatelessWidget {
           if (snapshot.hasError) return const Center(child: Text("Error!"));
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text("තවම සටහන් කිසිවක් නැත."));
           }
 
           return ListView.builder(
@@ -58,11 +70,11 @@ class NoteListScreen extends StatelessWidget {
                               .split('.')[0]
                         : "",
                   ),
-                  // Note එක උඩ ක්ලික් කළාම Edit කරන්න dialog එක open වෙයි
+                  // නෝට් එක උඩ ටැප් කළාම Edit කරන්න පුළුවන්
                   onTap: () => _showAddNoteDialog(context, doc: doc),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => doc.reference.delete(),
+                    onPressed: () => _showDeleteConfirmDialog(context, doc),
                   ),
                 ),
               );
@@ -71,16 +83,14 @@ class NoteListScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () =>
-            _showAddNoteDialog(context), // අලුත් එකක් නිසා doc යවන්නේ නැහැ
+        onPressed: () => _showAddNoteDialog(context),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  // මෙන්න වෙනස් කළ Function එක
+  // --- නෝට් එකක් ඇතුළත් කිරීමට හෝ සංස්කරණය කිරීමට (Add/Edit) ---
   void _showAddNoteDialog(BuildContext context, {DocumentSnapshot? doc}) {
-    // Edit කරනවා නම් පරණ text එක controller එකට දානවා
     final TextEditingController controller = TextEditingController(
       text: doc != null ? doc['text'] : "",
     );
@@ -95,6 +105,7 @@ class NoteListScreen extends StatelessWidget {
             hintText: "ඔබේ සටහන මෙතැන ලියන්න...",
           ),
           autofocus: true,
+          maxLines: null, // පේළි කිහිපයක් ලියන්න පුළුවන් වෙන්න
         ),
         actions: [
           TextButton(
@@ -105,16 +116,15 @@ class NoteListScreen extends StatelessWidget {
             onPressed: () async {
               if (controller.text.isNotEmpty) {
                 if (doc == null) {
-                  // අලුත් Note එකක් එකතු කිරීම
+                  // අලුත් එකක් එකතු කිරීම
                   await FirebaseFirestore.instance.collection('notes').add({
                     'text': controller.text,
                     'createdAt': FieldValue.serverTimestamp(),
                   });
                 } else {
-                  // තියෙන Note එකක් Update කිරීම
+                  // පරණ එකක් Update කිරීම
                   await doc.reference.update({
                     'text': controller.text,
-                    // කාලයත් update වෙන්න ඕන නම් විතරක් මේක දාන්න
                     'updatedAt': FieldValue.serverTimestamp(),
                   });
                 }
@@ -122,6 +132,30 @@ class NoteListScreen extends StatelessWidget {
               }
             },
             child: Text(doc != null ? "Update" : "Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- මකන්න කලින් ඇසීමට (Delete Confirmation) ---
+  void _showDeleteConfirmDialog(BuildContext context, DocumentSnapshot doc) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: const Text("ඔබට විශ්වාසද මෙම සටහන මැකීමට අවශ්‍ය බව?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("No"),
+          ),
+          TextButton(
+            onPressed: () async {
+              await doc.reference.delete();
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text("Yes", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
