@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'firebase_options.dart'; // flutterfire configure මගින් හැදුණු file එක
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Firebase මුලින්ම පණගැන්වීම
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
   runApp(const MyApp());
 }
 
@@ -19,11 +16,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Simple Note App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
       home: const NoteListScreen(),
     );
   }
@@ -35,13 +28,7 @@ class NoteListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("My Firebase Notes"),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        centerTitle: true,
-      ),
-
-      // Real-time දත්ත පෙන්වන කොටස
+      appBar: AppBar(title: const Text("My Firebase Notes"), centerTitle: true),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('notes')
@@ -51,10 +38,6 @@ class NoteListScreen extends StatelessWidget {
           if (snapshot.hasError) return const Center(child: Text("Error!"));
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("තවම notes කිසිවක් නැත."));
           }
 
           return ListView.builder(
@@ -75,10 +58,11 @@ class NoteListScreen extends StatelessWidget {
                               .split('.')[0]
                         : "",
                   ),
+                  // Note එක උඩ ක්ලික් කළාම Edit කරන්න dialog එක open වෙයි
+                  onTap: () => _showAddNoteDialog(context, doc: doc),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () =>
-                        doc.reference.delete(), // Firestore එකෙන් delete කිරීම
+                    onPressed: () => doc.reference.delete(),
                   ),
                 ),
               );
@@ -86,23 +70,25 @@ class NoteListScreen extends StatelessWidget {
           );
         },
       ),
-
-      // අලුත් Note එකක් ඇතුළත් කරන බොත්තම
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddNoteDialog(context),
+        onPressed: () =>
+            _showAddNoteDialog(context), // අලුත් එකක් නිසා doc යවන්නේ නැහැ
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  // Note එකක් ඇතුළත් කිරීමට Dialog එකක් පෙන්වීම
-  void _showAddNoteDialog(BuildContext context) {
-    final TextEditingController controller = TextEditingController();
+  // මෙන්න වෙනස් කළ Function එක
+  void _showAddNoteDialog(BuildContext context, {DocumentSnapshot? doc}) {
+    // Edit කරනවා නම් පරණ text එක controller එකට දානවා
+    final TextEditingController controller = TextEditingController(
+      text: doc != null ? doc['text'] : "",
+    );
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Add New Note"),
+        title: Text(doc != null ? "Edit Note" : "Add New Note"),
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
@@ -118,15 +104,24 @@ class NoteListScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               if (controller.text.isNotEmpty) {
-                // Firebase Firestore එකට දත්ත යැවීම
-                await FirebaseFirestore.instance.collection('notes').add({
-                  'text': controller.text,
-                  'createdAt': FieldValue.serverTimestamp(),
-                });
+                if (doc == null) {
+                  // අලුත් Note එකක් එකතු කිරීම
+                  await FirebaseFirestore.instance.collection('notes').add({
+                    'text': controller.text,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                } else {
+                  // තියෙන Note එකක් Update කිරීම
+                  await doc.reference.update({
+                    'text': controller.text,
+                    // කාලයත් update වෙන්න ඕන නම් විතරක් මේක දාන්න
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                }
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            child: const Text("Save"),
+            child: Text(doc != null ? "Update" : "Save"),
           ),
         ],
       ),
