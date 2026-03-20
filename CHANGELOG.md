@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/iamlasantha/note-app/compare/v1.2.0...v1.2.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* prevent saving empty or whitespace-only notes ([ad56e9b](https://github.com/iamlasantha/note-app/commit/ad56e9b3fb79481c9df5c86c6e42b039cd1218bf))
+
 ## [1.2.0](https://github.com/iamlasantha/note-app/compare/v1.1.0...v1.2.0) (2026-03-20)
 
 
