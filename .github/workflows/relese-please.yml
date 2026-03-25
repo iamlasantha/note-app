@@ -21,7 +21,7 @@ jobs:
         with:
           release-type: simple
 
-  # Release එකක් හැදුණු පසු APK එක build කරන කොටස
+  
   build-and-release-apk:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
@@ -33,9 +33,9 @@ jobs:
           channel: 'stable'
       
       - run: flutter pub get
-      - run: flutter build apk --release # APK එක build කිරීම
+      - run: flutter build apk --release 
 
-      # Build වුණු APK එක GitHub Release එකට Upload කිරීම
+      
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
